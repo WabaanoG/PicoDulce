@@ -1,5 +1,6 @@
 import sys
 import subprocess
+import ctypes
 import threading
 import logging
 from PyQt5.QtWidgets import QApplication, QComboBox, QWidget, QVBoxLayout, QPushButton, QMessageBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QCheckBox
@@ -8,6 +9,7 @@ from PyQt5.QtCore import Qt
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 class PicomcVersionSelector(QWidget):
     def __init__(self):
         super().__init__()
@@ -15,6 +17,7 @@ class PicomcVersionSelector(QWidget):
         self.init_ui()
 
     def init_ui(self):
+
         self.setWindowTitle('PicoDulce Launcher')  # Change window title
         self.setWindowIcon(QIcon('launcher_icon.ico'))  # Set window icon
         self.setGeometry(100, 100, 400, 250)
@@ -79,6 +82,8 @@ class PicomcVersionSelector(QWidget):
 
         self.setLayout(main_layout)
 
+
+        
     def populate_installed_versions(self):
         # Run the command and get the output
         try:
@@ -303,9 +308,60 @@ class PicomcVersionSelector(QWidget):
         palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
         palette.setColor(QPalette.HighlightedText, Qt.white)  # Change highlighted text color to white
         return palette
+    
+def install_dependencies():
+    try:
+        logging.info("Searching for Pip")
+        process = subprocess.Popen(['py', '-m', 'pip'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,)
+        output, error = process.communicate()
+        process.wait()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, process.args, error)
+        logging.info("Pip is installed")
+    except subprocess.CalledProcessError as e:
+        try:
+            logging.error("Pip in not installed")
+            logging.info("Installing Pip")
+            process = subprocess.Popen(['py', '-m', 'ensurepip', '--upgrade'])
+            output, error = process.communicate()
+            process.wait()
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, process.args, error)
+            logging.info("Pip installed successfully")
+        except FileNotFoundError:
+                logging.error("No tenes Python capo")
+                ctypes.windll.user32.MessageBoxW(0, 'Please install Python with "Path" checkbox! \n' + "https://www.python.org/", "Python is not installed!", 0)
+                #Por algun motivo este mensaje no se muestra y solo se abre y cierra la consola si no tenes Python bajado xd
 
+    logging.info("Installing Picomc")
+    process = subprocess.Popen(['py', '-m', 'pip', 'install', 'picomc'])
+    output, error = process.communicate()
+    process.wait()
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(process.returncode, process.args, error)
+    else:
+        logging.info("Picomc installed successfully")
+    
+
+                
 if __name__ == '__main__':
+    #Check if Picomc is installed
+    try:
+        logging.info("Searching for Picomc")
+        process = subprocess.Popen(['picomc'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,)
+        output, error = process.communicate()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, process.args, error)
+        logging.info("Picomc is installed")
+    except FileNotFoundError:
+        logging.error("'picomc' command not found")
+        install_dependencies()
+    except subprocess.CalledProcessError as e:
+        logging.error("Error: %s", e.stderr)
+
     app = QApplication(sys.argv)
     window = PicomcVersionSelector()
+    ctypes.windll.user32.ShowWindow( ctypes.windll.kernel32.GetConsoleWindow(), 0 )
     window.show()
+
     sys.exit(app.exec_())
